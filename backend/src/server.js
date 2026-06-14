@@ -115,35 +115,50 @@ try {
     // Check if cache got populated (CelesTrak may have been rate-limited)
     const stats = getCacheStats();
     if (!stats.satellites || stats.satellites === 0) {
-      console.log('[Boot] 📡 CelesTrak rate-limited — loading satellites from Supabase...');
+      console.log('[Boot] 📡 CelesTrak rate-limited — loading satellites from Supabase (paginated)...');
       try {
-        const { data, error } = await supabase
-          .from('satellites')
-          .select('norad_id, name, tle_line1, tle_line2, alt_km, lat, lng, velocity_kms, propagated_at')
-          .order('propagated_at', { ascending: false })
-          .limit(20000);
-        if (!error && data?.length > 0) {
-          // Normalize field names to match cache schema
-          const normalized = data.map(s => ({
-            norad_id:     s.norad_id,
-            name:         s.name,
-            tle_line1:    s.tle_line1,
-            tle_line2:    s.tle_line2,
-            alt_km:       s.alt_km,
-            lat:          s.lat,
-            lng:          s.lng,
-            velocity_kms: s.velocity_kms,
-          }));
-          setSatelliteCache(normalized);
-          console.log(`[Boot] ✅ Loaded ${normalized.length} satellites from Supabase cache`);
+        // Supabase PostgREST caps at 1000 rows per request — paginate to get all
+        const PAGE_SIZE = 1000;
+        let allSatellites = [];
+        let from = 0;
+        let hasMore = true;
+
+        while (hasMore) {
+          const { data, error } = await supabase
+            .from('satellites')
+            .select('norad_id, name, tle_line1, tle_line2, alt_km, lat, lng, velocity_kms')
+            .order('norad_id', { ascending: true })
+            .range(from, from + PAGE_SIZE - 1);
+
+          if (error) {
+            console.error(`[Boot] ❌ Supabase page error (from=${from}):`, error.message);
+            break;
+          }
+
+          if (!data || data.length === 0) {
+            hasMore = false;
+            break;
+          }
+
+          allSatellites = allSatellites.concat(data);
+          console.log(`[Boot] 📥 Loaded page ${Math.floor(from / PAGE_SIZE) + 1}: ${allSatellites.length} satellites so far…`);
+
+          hasMore = data.length === PAGE_SIZE; // if we got a full page, there may be more
+          from += PAGE_SIZE;
+        }
+
+        if (allSatellites.length > 0) {
+          setSatelliteCache(allSatellites);
+          console.log(`[Boot] ✅ Loaded ${allSatellites.length} satellites from Supabase cache`);
         } else {
-          console.log('[Boot] ⚠️  Supabase satellites table is also empty — will retry on next cron tick');
+          console.log('[Boot] ⚠️  Supabase satellites table is empty — will retry on next cron tick');
         }
       } catch (dbErr) {
         console.error('[Boot] ❌ Supabase fallback failed:', dbErr.message);
       }
     }
   };
+
 
   Promise.all([
     warmSatellites(),
