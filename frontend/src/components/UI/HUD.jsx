@@ -1,14 +1,14 @@
-import { StatsBar }      from './StatsBar';
-import { TogglePanel }   from './TogglePanel';
+import { StatsBar }       from './StatsBar';
+import { TogglePanel }    from './TogglePanel';
 import { BubbleControls } from './BubbleControls';
-import { ObjectCard }    from './ObjectCard';
+import { ObjectCard }     from './ObjectCard';
 
 export function HUD({
   filter, setFilter,
   satCount, asteroidCount, tleSource,
   userLocation, onRequestLocation, locationLoading, onClearLocation,
   bubbleRadius, setBubbleRadius,
-  selectedObject, onCloseCard,
+  selectedObject, insight, insightLoading, onCloseCard,
 }) {
   return (
     <div className="hud">
@@ -39,9 +39,14 @@ export function HUD({
         onClearLocation={onClearLocation}
       />
 
-      {/* Center-right: Selected object card */}
+      {/* Center-right: Selected object card with AI insight */}
       {selectedObject && (
-        <ObjectCard object={selectedObject} onClose={onCloseCard} />
+        <ObjectCard
+          object={selectedObject}
+          insight={insight}
+          insightLoading={insightLoading}
+          onClose={onCloseCard}
+        />
       )}
 
       {/* Bottom-center: Legend */}

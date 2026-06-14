@@ -1,10 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { EarthGlobe }    from './components/Globe/EarthGlobe';
 import { HUD }           from './components/UI/HUD';
 import { LoadingScreen } from './components/UI/LoadingScreen';
-import { useTLEData }        from './hooks/useTLEData';
-import { useAsteroidData }   from './hooks/useAsteroidData';
-import { useUserLocation }   from './hooks/useUserLocation';
+import { useTLEData }       from './hooks/useTLEData';
+import { useAsteroidData }  from './hooks/useAsteroidData';
+import { useUserLocation }  from './hooks/useUserLocation';
+import { useGeminiInsight } from './hooks/useGeminiInsight';
 
 export default function App() {
   const [filter,         setFilter]         = useState('both');
@@ -17,10 +18,10 @@ export default function App() {
   const { location, loading: locLoading, request: requestLocation, clear: clearLocation } = useUserLocation();
   const { asteroids, loading: astLoading } = useAsteroidData(location, bubbleRadius);
 
+  // AI Insight hook
+  const { insight, loading: insightLoading, error: insightError, fetchInsight, clear: clearInsight } = useGeminiInsight();
+
   // Mark app ready once the initial loading phase completes.
-  // We don't require tleData to be non-null — the TLE layer can populate
-  // later if CelesTrak is rate-limiting (503). A 3-second max-wait covers
-  // any edge case where tleLoading gets stuck.
   useEffect(() => {
     if (!tleLoading) {
       setTimeout(() => setAppReady(true), 800);
@@ -32,6 +33,17 @@ export default function App() {
     const t = setTimeout(() => setAppReady(true), 3000);
     return () => clearTimeout(t);
   }, []);
+
+  // When an object is selected, fetch its AI insight
+  const handleSelectObject = useCallback((obj) => {
+    setSelectedObject(obj);
+    if (obj) fetchInsight(obj);
+  }, [fetchInsight]);
+
+  const handleCloseCard = useCallback(() => {
+    setSelectedObject(null);
+    clearInsight();
+  }, [clearInsight]);
 
   return (
     <div className="app">
@@ -45,7 +57,7 @@ export default function App() {
         asteroids={asteroids}
         userLocation={location}
         bubbleRadius={bubbleRadius}
-        onSelectObject={setSelectedObject}
+        onSelectObject={handleSelectObject}
       />
 
       {/* HUD overlay */}
@@ -62,7 +74,9 @@ export default function App() {
         bubbleRadius={bubbleRadius}
         setBubbleRadius={setBubbleRadius}
         selectedObject={selectedObject}
-        onCloseCard={() => setSelectedObject(null)}
+        insight={insight}
+        insightLoading={insightLoading}
+        onCloseCard={handleCloseCard}
       />
     </div>
   );

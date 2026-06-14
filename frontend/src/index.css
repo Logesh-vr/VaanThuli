@@ -366,10 +366,14 @@ html, body, #root {
   top: 50%;
   right: var(--gap-lg);
   transform: translateY(-50%);
-  width: 260px;
+  width: 300px;
+  max-height: 80vh;
+  overflow-y: auto;
   padding: var(--gap-lg);
   z-index: 20;
   animation: slideInRight 0.25s var(--transition);
+  scrollbar-width: thin;
+  scrollbar-color: var(--panel-border) transparent;
 }
 
 @keyframes slideInRight {
@@ -451,6 +455,90 @@ html, body, #root {
   text-align: center;
   animation: hazard-pulse 2s ease-in-out infinite;
 }
+
+/* ── AI Insight Section ──────────────────────────────────────── */
+.card-ai-section {
+  margin-top: var(--gap-md);
+  border-top: 1px solid rgba(0, 200, 255, 0.1);
+  padding-top: var(--gap-sm);
+}
+
+.card-ai-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.card-ai-icon {
+  font-size: 0.7rem;
+  color: var(--accent-cyan);
+  animation: pulse-dot 2s ease-in-out infinite;
+}
+
+.card-ai-label {
+  font-family: 'Orbitron', monospace;
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  color: var(--accent-cyan);
+  flex: 1;
+}
+
+.card-ai-poweredby {
+  font-size: 0.55rem;
+  color: var(--text-muted);
+  letter-spacing: 0.08em;
+  background: rgba(66, 133, 244, 0.15);
+  border: 1px solid rgba(66, 133, 244, 0.25);
+  border-radius: 4px;
+  padding: 2px 6px;
+  color: #7baaf7;
+}
+
+.card-ai-body {
+  min-height: 48px;
+}
+
+.card-ai-loading {
+  display: flex;
+  align-items: center;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  padding: 4px 0;
+}
+
+.ai-dot {
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--accent-cyan);
+  margin-right: 4px;
+  animation: dot-bounce 1.4s ease-in-out infinite;
+}
+.ai-dot:nth-child(2) { animation-delay: 0.2s; }
+.ai-dot:nth-child(3) { animation-delay: 0.4s; }
+
+.card-ai-text {
+  font-size: 0.73rem;
+  line-height: 1.6;
+  color: var(--text-primary);
+  opacity: 0.9;
+  animation: fadeInUp 0.4s ease;
+}
+
+.card-ai-placeholder {
+  font-size: 0.68rem;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
 
 @keyframes hazard-pulse {
   0%, 100% { box-shadow: 0 0 8px rgba(255, 35, 68, 0.2); }
