@@ -41,31 +41,69 @@ export async function runTLEFetch() {
   console.log('[TLE Scheduler] ⟳ Starting TLE fetch from CelesTrak...');
 
   try {
-    // ── Step 1: Fetch TLE text ─────────────────────────────────
-    const response = await fetch(CELESTRAK_URL, {
-      headers: {
-        'User-Agent': 'VaanThuli/1.0 (Hackathon; contact: vaanthuli@example.com)',
-        'Accept':     'text/plain',
-      },
-      signal: AbortSignal.timeout(30_000), // 30s timeout
+    // ── Step 1 & 2: Fetch and Parse TLEs from KeepTrack ────────
+    let parsedTLEs = [];
+    const apiKey = process.env.KEEPTRACK_API_KEY;
+    if (!apiKey) {
+      throw new Error('Missing KEEPTRACK_API_KEY in environment');
+    }
+
+    console.log('[TLE Scheduler] Fetching satellite catalog from KeepTrack API...');
+    const keepTrackRes = await fetch(`https://api.keeptrack.space/v4/sats/brief?apiKey=${apiKey}`, {
+      signal: AbortSignal.timeout(30_000),
     });
 
-    if (!response.ok) {
-      throw new Error(`CelesTrak HTTP ${response.status}: ${response.statusText}`);
+    if (!keepTrackRes.ok) {
+      throw new Error(`KeepTrack API HTTP error: ${keepTrackRes.status}`);
     }
 
-    const rawText = await response.text();
+    const satsList = await keepTrackRes.json();
+    console.log(`[TLE Scheduler] Downloaded ${satsList.length} total objects from KeepTrack`);
 
-    if (!rawText || rawText.trim().length === 0) {
-      throw new Error('CelesTrak returned empty response');
-    }
+    // Filter active payloads and filter out corrupt years > 2027
+    const payloads = satsList.filter(sat => {
+      if (sat.type !== 1 || !sat.tle1 || !sat.tle2) return false;
+      if (sat.launchDate) {
+        const year = new Date(sat.launchDate).getFullYear();
+        if (isNaN(year) || year > 2027) return false;
+      }
+      return true;
+    });
 
-    // ── Step 2: Parse TLE text → structured objects ────────────
-    const parsedTLEs = parseTLEText(rawText);
-    console.log(`[TLE Scheduler] Parsed ${parsedTLEs.length} TLE sets`);
+    // Separate Starlink and non-Starlink payloads
+    const starlinks = payloads.filter(p => p.name && p.name.toUpperCase().includes('STARLINK'));
+    const others = payloads.filter(p => !p.name || !p.name.toUpperCase().includes('STARLINK'));
+
+    // Sort both descending by launch date to prioritize newer satellites
+    const sortByLaunchDate = (a, b) => {
+      const dateA = a.launchDate ? new Date(a.launchDate).getTime() : 0;
+      const dateB = b.launchDate ? new Date(b.launchDate).getTime() : 0;
+      return dateB - dateA;
+    };
+    starlinks.sort(sortByLaunchDate);
+    others.sort(sortByLaunchDate);
+
+    // Limit Starlinks to 1500 to keep high diversity, and combine with all ~7200 non-Starlink payloads
+    const limitedStarlinks = starlinks.slice(0, 1500);
+    const combined = [...others, ...limitedStarlinks];
+
+    // Map to normalized database format
+    parsedTLEs = combined.map(sat => {
+      const norad_id = parseInt(sat.tle2.substring(2, 7).trim(), 10).toString();
+      return {
+        norad_id,
+        name: sat.name || `SAT-${norad_id}`,
+        object_id: sat.altName || null,
+        epoch: sat.launchDate || null,
+        tle_line1: sat.tle1,
+        tle_line2: sat.tle2,
+      };
+    });
+
+    console.log(`[TLE Scheduler] Filtered and parsed ${parsedTLEs.length} active payloads`);
 
     if (parsedTLEs.length === 0) {
-      throw new Error('TLE parsing yielded 0 results — check raw format');
+      throw new Error('TLE fetching yielded 0 results from KeepTrack API');
     }
 
     // ── Step 3: Propagate all TLEs to current positions ────────

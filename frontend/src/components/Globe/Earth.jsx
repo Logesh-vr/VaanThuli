@@ -3,10 +3,10 @@ import { useFrame } from '@react-three/fiber';
 import { useTexture } from '@react-three/drei';
 import * as THREE from 'three';
 
-// Local textures served from /public/textures/ — no CDN dependency
-const EARTH_DAY_URL    = '/textures/earth-day.jpg';
-const EARTH_NIGHT_URL  = '/textures/earth-night.jpg';
-const EARTH_CLOUDS_URL = '/textures/earth-clouds.png';
+// Use reliable CDN textures to bypass local loading issues
+const EARTH_DAY_URL    = 'https://cdn.jsdelivr.net/gh/mrdoob/three.js@master/examples/textures/planets/earth_atmos_2048.jpg';
+const EARTH_NIGHT_URL  = 'https://cdn.jsdelivr.net/gh/mrdoob/three.js@master/examples/textures/planets/earth_lights_2048.png';
+const EARTH_CLOUDS_URL = 'https://cdn.jsdelivr.net/gh/mrdoob/three.js@master/examples/textures/planets/earth_clouds_1024.png';
 
 /**
  * EarthSphere — the textured Earth mesh with slow cloud rotation.
