@@ -18,7 +18,8 @@ export function useTLEData() {
 
   const fetchTLEs = async () => {
     try {
-      const res = await fetch('/api/core/tles');
+      const apiBase = import.meta.env.VITE_API_BASE_URL || '';
+      const res = await fetch(`${apiBase}/api/core/tles`);
 
       if (res.status === 503) {
         // Backend TLE cache not ready (CelesTrak rate-limit).

@@ -698,3 +698,31 @@ html, body, #root {
   .brand-title { font-size: 1.2rem; }
   .object-card { width: calc(100vw - 32px); right: 16px; }
 }
+
+/* N2YO External Link Button */
+.n2yo-link-btn {
+  display: block;
+  width: 100%;
+  margin-top: 14px;
+  padding: 10px;
+  border-radius: var(--radius-sm);
+  background: rgba(0, 229, 255, 0.08);
+  border: 1px solid rgba(0, 229, 255, 0.25);
+  color: var(--accent-cyan);
+  text-decoration: none;
+  font-family: 'Orbitron', monospace;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-align: center;
+  letter-spacing: 0.05em;
+  transition: var(--transition);
+  cursor: pointer;
+}
+
+.n2yo-link-btn:hover {
+  background: rgba(0, 229, 255, 0.15);
+  border-color: var(--accent-cyan);
+  box-shadow: 0 0 14px rgba(0, 229, 255, 0.25);
+  color: var(--text-primary);
+}
+

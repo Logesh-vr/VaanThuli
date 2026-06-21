@@ -1,60 +1,84 @@
-import { useRef, useEffect, useMemo, useCallback } from 'react';
+import { useRef, useEffect, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
-import { latLngToVector3, altToRadius, getOrbitColor } from '../../utils/propagator';
+import { latLngToVector3, altToRadius, getOrbitColor, propagateTLE } from '../../utils/propagator';
 import { MAX_DISPLAY_SATELLITES } from '../../utils/constants';
 
 /**
  * SatelliteLayer
  * ──────────────
  * Renders satellites using THREE.InstancedMesh (1 draw call for all dots).
- *
- * SIMPLIFIED APPROACH: Uses server-pre-propagated lat/lng/alt_km directly.
- * No client-side satellite.js re-propagation — just convert lat/lng → 3D vector.
- * Positions update every 30s by asking the parent for fresh data (via re-fetch).
- *
- * This avoids all TLE-parsing failures that were causing 0 visible satellites.
+ * 
+ * Performs client-side SGP4 real-time propagation from TLEs every second.
+ * Fallbacks to server-pre-computed coordinates if TLE parsing fails.
  */
 export function SatelliteLayer({ tleData, visible, onSelect }) {
-  const meshRef      = useRef();
+  const meshRef = useRef();
   const positionsRef = useRef([]);  // { pos, name, norad_id, lat, lng, altKm }[]
-  const colorsBaked  = useRef(false);
+  const colorsBaked = useRef(false);
 
   const dummy = useMemo(() => new THREE.Object3D(), []);
 
-  // ── Build positions from server lat/lng/alt_km ───────────────
-  const buildPositions = useCallback(() => {
+  const colorArray = useMemo(() => {
+    const arr = new Float32Array(MAX_DISPLAY_SATELLITES * 3);
+    arr.fill(1); // initialize all to white (1, 1, 1)
+    return arr;
+  }, []);
+
+  // ── Periodic propagation of positions on client side ──────────
+  useEffect(() => {
     if (!tleData?.length) {
       positionsRef.current = [];
+      colorsBaked.current = false;
       return;
     }
 
     const limited = tleData.slice(0, MAX_DISPLAY_SATELLITES);
-    const results = [];
 
-    for (const sat of limited) {
-      try {
-        const lat   = sat.lat;
-        const lng   = sat.lng;
-        const altKm = sat.alt_km;  // server field name is alt_km
+    const updatePositions = () => {
+      const results = [];
+      const now = new Date();
 
-        if (!isFinite(lat) || !isFinite(lng) || !isFinite(altKm) || altKm < 0) continue;
+      for (const sat of limited) {
+        try {
+          let lat, lng, altKm;
 
-        const r   = altToRadius(altKm);
-        const pos = latLngToVector3(lat, lng, r);
-        results.push({ pos, name: sat.name, norad_id: sat.norad_id, lat, lng, altKm });
-      } catch { /* skip */ }
-    }
+          // Try to propagate live from TLE
+          if (sat.tle_line1 && sat.tle_line2) {
+            const pos = propagateTLE(sat.tle_line1, sat.tle_line2, now);
+            if (pos) {
+              lat = pos.lat;
+              lng = pos.lng;
+              altKm = pos.altKm;
+            }
+          }
 
-    console.log(`[SatelliteLayer] Built ${results.length} positions from ${limited.length} TLEs`);
-    positionsRef.current = results;
-    colorsBaked.current  = false; // signal useFrame to rebake colors
+          // Fallback to server pre-propagated values if TLE propagation fails
+          if (lat === undefined) {
+            lat = sat.lat;
+            lng = sat.lng;
+            altKm = sat.alt_km;
+          }
+
+          if (!isFinite(lat) || !isFinite(lng) || !isFinite(altKm) || altKm < 0) continue;
+
+          const r = altToRadius(altKm);
+          const pos = latLngToVector3(lat, lng, r);
+          results.push({ pos, name: sat.name, norad_id: sat.norad_id, lat, lng, altKm });
+        } catch { /* skip */ }
+      }
+
+      positionsRef.current = results;
+      colorsBaked.current = false; // Trigger colors update when positions/count change
+    };
+
+    // Run immediately
+    updatePositions();
+
+    // Run every 1000ms to show real-time smooth orbit tracking
+    const interval = setInterval(updatePositions, 1000);
+    return () => clearInterval(interval);
   }, [tleData]);
-
-  // Rebuild positions whenever tleData changes
-  useEffect(() => {
-    buildPositions();
-  }, [buildPositions]);
 
   // ── Bake colors + push matrices every frame ──────────────────
   useFrame(() => {
@@ -78,7 +102,7 @@ export function SatelliteLayer({ tleData, visible, onSelect }) {
     // Update matrix for every satellite every frame
     for (let i = 0; i < positions.length; i++) {
       dummy.position.copy(positions[i].pos);
-      dummy.scale.setScalar(0.005);
+      dummy.scale.setScalar(1.0); // Fix microscopic scale so they are visible
       dummy.updateMatrix();
       meshRef.current.setMatrixAt(i, dummy.matrix);
     }
@@ -93,24 +117,36 @@ export function SatelliteLayer({ tleData, visible, onSelect }) {
     <instancedMesh
       ref={meshRef}
       args={[null, null, MAX_DISPLAY_SATELLITES]}
-      frustumCulled={false}
       onPointerDown={(e) => {
         e.stopPropagation();
-        const sat = positionsRef.current[e.instanceId];
-        if (sat && onSelect) {
-          onSelect({
-            type:     'satellite',
-            name:     sat.name,
+        const instanceId = e.instanceId;
+        if (instanceId !== undefined && positionsRef.current[instanceId]) {
+          const sat = positionsRef.current[instanceId];
+          onSelect?.({
+            type: 'satellite',
+            name: sat.name,
             norad_id: sat.norad_id,
-            lat:      sat.lat,
-            lng:      sat.lng,
-            altKm:    sat.altKm,
+            altKm: sat.altKm,
+            lat: sat.lat,
+            lng: sat.lng,
           });
         }
       }}
+      onPointerOver={(e) => {
+        e.stopPropagation();
+        document.body.style.cursor = 'pointer';
+      }}
+      onPointerOut={(e) => {
+        e.stopPropagation();
+        document.body.style.cursor = 'auto';
+      }}
     >
-      <sphereGeometry args={[0.003, 6, 6]} />
-      <meshBasicMaterial vertexColors />
+      <octahedronGeometry args={[0.015, 0]} />
+      <meshBasicMaterial />
+      <instancedBufferAttribute
+        attach="instanceColor"
+        args={[colorArray, 3]}
+      />
     </instancedMesh>
   );
 }

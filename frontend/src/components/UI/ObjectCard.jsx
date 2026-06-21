@@ -18,6 +18,7 @@ export function ObjectCard({ object, insight, insightLoading, onClose }) {
       <div className="card-stats">
         {isSat && (
           <>
+            <StatRow label="Mission"   value={getMissionCategory(object.name, object.altKm)} />
             <StatRow label="Altitude"  value={`${object.altKm?.toFixed(1)} km`} />
             <StatRow label="NORAD ID"  value={`#${object.norad_id}`} />
             <StatRow label="Orbit"     value={orbitClass(object.altKm)} />
@@ -51,6 +52,17 @@ export function ObjectCard({ object, insight, insightLoading, onClose }) {
         )}
       </div>
 
+      {isSat && (
+        <a 
+          href={`https://www.n2yo.com/?s=${object.norad_id}`}
+          target="_blank" 
+          rel="noopener noreferrer"
+          className="n2yo-link-btn"
+        >
+          Track Live on N2YO ↗
+        </a>
+      )}
+
       {isHazardous && (
         <div className="card-hazard">⚠️ Potentially Hazardous Asteroid</div>
       )}
@@ -59,7 +71,7 @@ export function ObjectCard({ object, insight, insightLoading, onClose }) {
       <div className="card-ai-section">
         <div className="card-ai-header">
           <span className="card-ai-icon">✦</span>
-          <span className="card-ai-label">AI INSIGHT</span>
+          <span className="card-ai-label">{isSat ? 'MISSION PROFILE' : 'COSMIC PROFILE'}</span>
           <span className="card-ai-poweredby">Gemini</span>
         </div>
 
@@ -67,14 +79,16 @@ export function ObjectCard({ object, insight, insightLoading, onClose }) {
           {insightLoading && (
             <div className="card-ai-loading">
               <span className="ai-dot" /><span className="ai-dot" /><span className="ai-dot" />
-              <span style={{ marginLeft: 8 }}>Analysing…</span>
+              <span style={{ marginLeft: 8 }}>Analyzing…</span>
             </div>
           )}
           {!insightLoading && insight && (
             <p className="card-ai-text">{insight}</p>
           )}
           {!insightLoading && !insight && (
-            <p className="card-ai-placeholder">Click to reveal cosmic intelligence…</p>
+            <p className="card-ai-placeholder">
+              {isSat ? 'Click to reveal mission profile…' : 'Click to reveal cosmic intelligence…'}
+            </p>
           )}
         </div>
       </div>
@@ -96,4 +110,32 @@ function orbitClass(altKm) {
   if (altKm < 2000)  return 'LEO';
   if (altKm < 35786) return 'MEO';
   return 'GEO';
+}
+
+function getMissionCategory(name, altKm) {
+  const nameUpper = (name || '').toUpperCase();
+  if (nameUpper.includes('STARLINK') || nameUpper.includes('ONEWEB') || nameUpper.includes('IRIDIUM')) {
+    return 'Global Broadband Internet';
+  }
+  if (nameUpper.includes('ISS') || nameUpper.includes('ZARYA') || nameUpper.includes('TIANGONG') || nameUpper.includes('CSS')) {
+    return 'Manned Space Station / Science';
+  }
+  if (nameUpper.includes('GPS') || nameUpper.includes('NAVSTAR') || nameUpper.includes('GLONASS') || nameUpper.includes('GALILEO') || nameUpper.includes('BEIDOU')) {
+    return 'Global Satellite Navigation (GNSS)';
+  }
+  if (nameUpper.includes('NOAA') || nameUpper.includes('METOP') || nameUpper.includes('GOES') || nameUpper.includes('FENGYUN') || nameUpper.includes('HIMAWARI') || nameUpper.includes('SENTINEL')) {
+    return 'Meteorology / Earth Observation';
+  }
+  if (nameUpper.includes('HUBBLE') || nameUpper.includes('HST') || nameUpper.includes('JWST') || nameUpper.includes('KEPLER') || nameUpper.includes('CHANDRA')) {
+    return 'Space Telescope / Astronomy';
+  }
+  
+  // Generic guess based on altitude
+  if (altKm < 2000) {
+    return 'Earth Observation & Telecom';
+  } else if (altKm < 35786) {
+    return 'Navigation & Regional Telecom';
+  } else {
+    return 'Geostationary Broadcast & Comms';
+  }
 }

@@ -15,8 +15,9 @@ export function useAsteroidData(userLocation, radius = 500) {
     const lng = userLocation?.lng ?? 0;
 
     try {
+      const apiBase = import.meta.env.VITE_API_BASE_URL || '';
       const res = await fetch(
-        `/api/core/sky-bubble?lat=${lat}&lng=${lng}&radius=${radius}&type=asteroids`
+        `${apiBase}/api/core/sky-bubble?lat=${lat}&lng=${lng}&radius=${radius}&type=asteroids`
       );
       if (!res.ok) return;
 

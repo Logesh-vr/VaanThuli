@@ -6,6 +6,7 @@
  */
 
 import * as THREE from 'three';
+import * as satellite from 'satellite.js';
 import {
   EARTH_RADIUS_THREEJS,
   EARTH_RADIUS_KM,
@@ -81,3 +82,35 @@ export function asteroidPosition(neo) {
     distUnits * Math.sin(theta) * Math.sin(phi),
   );
 }
+
+/**
+ * Propagates a single TLE set to a given time.
+ * Returns geodetic coordinates in degrees and altitude in km.
+ */
+export function propagateTLE(tleLine1, tleLine2, at = new Date()) {
+  try {
+    const satrec = satellite.twoline2satrec(tleLine1.trim(), tleLine2.trim());
+    const result = satellite.propagate(satrec, at);
+    
+    if (!result || !result.position || typeof result.position === 'boolean') {
+      return null;
+    }
+    
+    const posECI = result.position;
+    const gmst = satellite.gstime(at);
+    const posGeodetic = satellite.eciToGeodetic(posECI, gmst);
+    
+    const lat = satellite.radiansToDegrees(posGeodetic.latitude);
+    const lng = satellite.radiansToDegrees(posGeodetic.longitude);
+    const altKm = posGeodetic.height;
+    
+    return {
+      lat: parseFloat(lat.toFixed(6)),
+      lng: parseFloat(lng.toFixed(6)),
+      altKm: parseFloat(altKm.toFixed(3)),
+    };
+  } catch {
+    return null;
+  }
+}
+
